@@ -29,21 +29,23 @@ uint64_t f(uint64_t R, uint64_t K)
 
     // E 变换 32 -> 48
     for(int i=0; i<48; ++i)
-        expandR = expandR | (((R >> E[i]) & 0x1) << i);
+        expandR |= (((R >> E[i]) & 0x1) << i);
 
     // R XOR K
-    expandR = expandR ^ K;
+    expandR ^= K;
 
     // 查找S_BOX置换表
     uint64_t output = 0;
     int x = 0;
     uint64_t mask = 65;// 每次用低六位
+    int index = 0;
+    uint64_t num = 0;
     for(int i=0; i<8; ++i)
     {
-        int index = expandR & mask;
+        index = expandR & mask;
         expandR = expandR >> 6;
-        uint64_t num = S_BOX2[i][index];
-        output = output | (num << x);
+        num = S_BOX2[i][index];
+        output |= (num << x);
         x += 4;
     }
 
@@ -51,7 +53,7 @@ uint64_t f(uint64_t R, uint64_t K)
     uint64_t tmp = output;
     output = 0;
     for(int i=0; i<32; ++i)
-        output =  output | (((tmp >> P[i]) & 0x1) << i);
+        output |= (((tmp >> P[i]) & 0x1) << i);
 
     return output;
 }
@@ -75,7 +77,7 @@ void generateKeys()
     uint64_t compressKey = 0;
     // 去掉奇偶标记位，将64位密钥变成56位
     for (int i=0; i<56; ++i)
-        realKey = realKey | (((key >> PC_1[i]) & 0x1) << i);
+        realKey |= (((key >> PC_1[i]) & 0x1) << i);
     // 生成子密钥，保存在 subKeys[16] 中
     for(int round=0; round<16; ++round)
     {
@@ -87,9 +89,9 @@ void generateKeys()
         leftShift(right, shiftBits[round]);
         // 压缩置换，由56位得到48位子密钥
         realKey = (left << 28) | right;
-        // 第五步：结尾置换IP-1
+        // 第五步：结尾置换FP
         for(int i=0; i<48; ++i)
-            compressKey = compressKey | (((realKey >> PC_2[i]) & 0x1) << i);
+            compressKey |= (((realKey >> PC_2[i]) & 0x1) << i);
         subKey[round] = compressKey;
     }
 }
@@ -122,9 +124,8 @@ void split(const string &s, char delim, Out result)
     stringstream ss;
     ss.str(s);
     string item;
-    while (getline(ss, item, delim)) {
-        *(result++) = item;
-    }
+    while (getline(ss, item, delim))
+        *result++ = item;
 }
 
 vector<string> split(const string &s, char delim)
@@ -143,7 +144,7 @@ uint64_t crypt(uint64_t &input, bool ed)
     uint64_t newLeft = 0;
     // 第一步：初始置换IP
     for(int i=0; i<64; ++i)
-        currentBits = currentBits | (((input >> IP[i]) & 0x1) << i);
+        currentBits |= (((input >> IP[i]) & 0x1) << i);
     // 第二步：获取 Li 和 Ri
     left = currentBits >> 32;
     right = currentBits & 0xffffffff;
@@ -173,7 +174,7 @@ uint64_t crypt(uint64_t &input, bool ed)
     currentBits = output;
     output = 0;
     for(int i=0; i<64; ++i)
-        output = output | (((currentBits >> FP[i]) & 0x1) << i);
+        output |= (((currentBits >> FP[i]) & 0x1) << i);
     // 返回明文／密文
     return output;
 }
@@ -210,9 +211,10 @@ std::streampos fileSize(string path)
 string encryptFile(const string &path)
 {
     start = clock();
+
     ifstream in;
     ofstream out;
-    std::streampos sp = fileSize(path);// 文件字节数
+    uint64_t sp = fileSize(path);// 文件字节数
     vector<string> x = split(path, '/');
     string ends = x[x.size()-1];// ends表示原文件名
     string savePath = "/Users/macbookair/Desktop/encrypted_" + ends;
@@ -226,19 +228,23 @@ string encryptFile(const string &path)
         cipher  = encrypt(plain);
         out.write((char*)&cipher, 8);
     }
-    //对于不足8个字节的缺几个字节就在后边补几个几，如5个字节需要补3个3，特别的，补8个8
+//    string temp = "";
+    // Bin2Hex(plain)返回的是八个字节，需筛选真正内容
+//    for(auto c: Bin2Hex(plain))
+//        if(isprint(c))
+//            temp = temp + c;
+//    plain = Hex2Bin(temp+C[7-sp%8]);
     in.read((char*)&plain, sp%8);
-    string completion = C[7-sp%8];
-    string temp = "";
-    // bitsetToString(plain)返回的是八个字节，需筛选真正内容
-    for(auto c: Bin2Hex(plain))
-        if(isprint(c))
-            temp = temp + c;
-    plain = Hex2Bin(temp+completion);
     cipher  = encrypt(plain);
     out.write((char*)&cipher, 8);
+
+    in.read((char*)&plain, sp%8);
+    cipher = encrypt(sp);
+    out.write((char*)&cipher, 8);
+
     in.close();
     out.close();
+
     finish = clock();
     total = (double)(finish-start);
     double speed = sp * 1E6 / total / 1024;
@@ -249,28 +255,36 @@ string encryptFile(const string &path)
 // 解密文件
 string decryptFile(const string &path)
 {
-    start = clock();
+    start = clock();// 计时
+
     ifstream in;
     ofstream out;
     uint64_t cipher = 0, plain = 0;
     in.open(path, ios::binary);
-    std::streampos sp = fileSize(path);// 文件字节数
+    uint64_t sp = fileSize(path);// 文件字节数
     vector<string> x = split(path, '/');
     string ends = x[x.size()-1];
     string savePath = "/Users/macbookair/Desktop/decrypted_" + ends;
     out.open(savePath, ios::binary);
     int round = sp/8;
-    for(int i=0; i<round-1; ++i)// 解密时注意循环上界
+    for(int i=0; i<round-2; ++i)// 解密时注意循环上界
     {
         in.read((char*)&cipher, 8);
         plain = decrypt(cipher);
         out.write((char*)&plain, 8);
     }
+//    in.read((char*)&cipher, 8);
+//    plain = decrypt(cipher);
+//    string lastEight = Bin2Hex(plain);
+//    int deleteCount = lastEight[7] - '0';// 不能用(int)强制转换，这样得到的是对应的ascii码
+//    out.write((char*)&plain, 8-deleteCount);// 删除(不写入)末尾的几个几
+    uint64_t tmp = 0, file_size = 0;
     in.read((char*)&cipher, 8);
-    plain = decrypt(cipher);
-    string lastEight = Bin2Hex(plain);
-    int deleteCount = lastEight[7] - '0';// 不能用(int)强制转换，这样得到的是对应的ascii码
-    out.write((char*)&plain, 8-deleteCount);// 删除(不写入)末尾的几个几
+    tmp = decrypt(cipher);
+    in.read((char*)&cipher, 8);
+    file_size = decrypt(cipher);
+    out.write((char*)&tmp, file_size % 8);
+
     in.close();
     out.close();
     finish=clock();

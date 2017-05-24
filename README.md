@@ -10,13 +10,20 @@ C++练手小工具，DES加解密，使用Qt creator
 # 说明  
 每个untitled\*原名都为untitled，需修改回原名后才能正确编译
 
-version 1.0
+version 1.0  
 使用bitset  
 单线程，不开启 gcc -O3 编译优化的情况下：  
 平均加解密速度：100 Kb/s左右  
 
-version 2.0
+version 2.0  
 使用uint_64代替bitset，自己实现位运算  
 单线程，不开启 gcc -O3 编译优化的情况下：  
 平均加解密速度：1 M/s左右  
 若开启开启 gcc -O3 编译 优化，速度  可增至3 M/s  
+
+细节优化后  
+平均加解密速度：1.4 M/s左右  
+
+修复字节数不准的bug  
+方法从version 1.0的末尾补全法变为文件末尾写入总字节法
+

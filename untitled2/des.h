@@ -40,9 +40,9 @@ string decryptFile(const string &path);
 // 计算文件大小
 std::streampos fileSize(string filename);
 
-// 补充字节
-const string C[] = {"1", "22", "333", "4444", "55555",
-                    "666666", "7777777", "88888888"};
+//// 补充字节
+//const string C[] = {"1", "22", "333", "4444", "55555",
+//                    "666666", "7777777", "88888888"};
 
 // 初始置换表 IP(initial permutation) - 1
 const int IP[] = { 57, 49, 41, 33, 25, 17,  9, 1,
