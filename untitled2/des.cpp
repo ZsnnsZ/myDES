@@ -29,31 +29,32 @@ uint64_t f(uint64_t R, uint64_t K)
 
     // E 变换 32 -> 48
     for(int i=0; i<48; ++i)
-        expandR |= (((R >> E[i]) & 0x1) << i);
+        expandR |= (((R >> (31-E[i])) & 0x1) << (47-i));
 
+    cout << "E: " << Bin2Hex(expandR) << endl;
     // R XOR K
     expandR ^= K;
 
     // 查找S_BOX置换表
     uint64_t output = 0;
     int x = 0;
-    uint64_t mask = 65;// 每次用低六位
+    uint64_t mask = 63;// 每次用低六位
     int index = 0;
     uint64_t num = 0;
     for(int i=0; i<8; ++i)
     {
         index = expandR & mask;
         expandR = expandR >> 6;
-        num = S_BOX2[i][index];
+        num = S_BOX2[7-i][index];
         output |= (num << x);
         x += 4;
     }
-
+    cout << "S: " << Bin2Hex(output) << endl;
     // P-置换，32 -> 32
     uint64_t tmp = output;
     output = 0;
     for(int i=0; i<32; ++i)
-        output |= (((tmp >> P[i]) & 0x1) << i);
+        output |= (((tmp >> (31-P[i])) & 0x1) << (31-i));
 
     return output;
 }
@@ -63,7 +64,7 @@ uint64_t f(uint64_t R, uint64_t K)
  */
 void leftShift(uint64_t &k, int shift)
 {
-    k = (k << shift) | (k >> (28 - shift));
+    k = ((k << shift) | (k >> (28 - shift))) & 0x0fffffff;
 }
 
 /**
@@ -76,8 +77,16 @@ void generateKeys()
     uint64_t right = 0;
     uint64_t compressKey = 0;
     // 去掉奇偶标记位，将64位密钥变成56位
+//    cout << key << endl;
+//    key &= 0xf000000000000000;
+//    key = key >> 60;
+//    cout << key << endl;
+    cout << "初始密钥： " << Bin2Hex(key) << endl;
+
     for (int i=0; i<56; ++i)
-        realKey |= (((key >> PC_1[i]) & 0x1) << i);
+        realKey |= (((key >> (63-PC_1[i])) & 0x1) << (55-i));
+
+    cout << "密钥初始置换： " << Bin2Hex(realKey) << endl;
     // 生成子密钥，保存在 subKeys[16] 中
     for(int round=0; round<16; ++round)
     {
@@ -91,8 +100,10 @@ void generateKeys()
         realKey = (left << 28) | right;
         // 第五步：结尾置换FP
         for(int i=0; i<48; ++i)
-            compressKey |= (((realKey >> PC_2[i]) & 0x1) << i);
+            compressKey |= (((realKey >> (55-PC_2[i])) & 0x1) << (47-i));
+
         subKey[round] = compressKey;
+        compressKey = 0;
     }
 }
 
@@ -144,7 +155,9 @@ uint64_t crypt(uint64_t &input, bool ed)
     uint64_t newLeft = 0;
     // 第一步：初始置换IP
     for(int i=0; i<64; ++i)
-        currentBits |= (((input >> IP[i]) & 0x1) << i);
+        currentBits |= (((input >> (63-IP[i])) & 0x1) << (63-i));
+
+    cout << "数据初始置换: " << Bin2Hex(currentBits) << endl;
     // 第二步：获取 Li 和 Ri
     left = currentBits >> 32;
     right = currentBits & 0xffffffff;
@@ -174,7 +187,7 @@ uint64_t crypt(uint64_t &input, bool ed)
     currentBits = output;
     output = 0;
     for(int i=0; i<64; ++i)
-        output |= (((currentBits >> FP[i]) & 0x1) << i);
+        output |= (((currentBits >> (63-FP[i])) & 0x1) << (63-i));
     // 返回明文／密文
     return output;
 }

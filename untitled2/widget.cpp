@@ -34,7 +34,7 @@ void Widget::on_pushButton_key_clicked()
     for (int i=0; i<16; ++i)
     {
         tmpSubKey = Bin2Hex(subKey[i]);
-        cout << tmpSubKey << endl;
+        cout << "Key[" << i << "]: " << tmpSubKey << endl;
     }
     cout << "The Key and SubKeys have been calculated"<< endl;
     cout << "-----------------------------------------------------" << endl;
